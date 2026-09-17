@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SCAB</string>
+    <string name="title_activity_main">SCAB</string>
+    <string name="package_name">in.sih2026.scab</string>
+    <string name="custom_url_scheme">in.sih2026.scab</string>
+</resources>
