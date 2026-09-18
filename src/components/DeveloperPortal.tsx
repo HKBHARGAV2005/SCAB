@@ -346,21 +346,34 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
               </p>
             </div>
 
-            {/* Day Selector Tabs (1 to 10) */}
-            <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-slate-700 overflow-x-auto max-w-full">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setFilterDay(d)}
-                  className={`px-2.5 py-1 text-xs font-mono font-bold rounded-lg transition-all ${
-                    filterDay === d
-                      ? 'bg-indigo-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Day {d}
-                </button>
-              ))}
+            {/* Day Selector Tabs (1 to 10) with Day name below */}
+            <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-700/80 overflow-x-auto max-w-full">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => {
+                const dayData = weather?.daily?.[d - 1];
+                const dayLabel = d === 1 ? 'Today' : (dayData?.dayOfWeek || ['Today', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d - 1]);
+                const isSelected = filterDay === d;
+
+                return (
+                  <button
+                    key={d}
+                    onClick={() => setFilterDay(d)}
+                    className={`px-3 py-1.5 text-xs font-mono font-bold rounded-xl transition-all flex flex-col items-center justify-center min-w-[58px] ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-indigo-400'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
+                    }`}
+                  >
+                    <span className="leading-tight">Day {d}</span>
+                    <span
+                      className={`text-[10px] font-semibold mt-0.5 capitalize leading-tight ${
+                        isSelected ? 'text-indigo-200' : 'text-slate-400'
+                      }`}
+                    >
+                      {dayLabel}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
