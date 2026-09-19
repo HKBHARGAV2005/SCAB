@@ -47,7 +47,7 @@ export async function fetchTenDayForecast(
   latitude: number,
   longitude: number
 ): Promise<WeatherData> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,rain,cloud_cover,direct_normal_irradiance,shortwave_radiation,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max,wind_speed_10m_max,wind_direction_10m_dominant,sunrise,sunset&timezone=auto&forecast_days=10`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,rain,cloud_cover,direct_normal_irradiance,shortwave_radiation,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max,wind_speed_10m_max,wind_direction_10m_dominant,sunrise,sunset&timezone=auto&forecast_days=10`;
 
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(6500) });
@@ -63,6 +63,7 @@ export async function fetchTenDayForecast(
     const hourlyClouds: number[] = data.hourly?.cloud_cover || [];
     const hourlySolar: number[] = data.hourly?.shortwave_radiation || [];
     const hourlyWind: number[] = data.hourly?.wind_speed_10m || [];
+    const hourlyWCode: number[] = data.hourly?.weather_code || [];
 
     const nowHour = new Date().getHours();
 
@@ -70,26 +71,49 @@ export async function fetchTenDayForecast(
       const timeStr = hourlyTimes[i];
       const d = new Date(timeStr);
       const hour = d.getHours();
-      const isNight = hour >= 22 || hour <= 5;
+      const isNight = hour >= 19 || hour <= 5;
       const clouds = hourlyClouds[i] ?? 40;
       const temp = hourlyTemps[i] ?? 22;
       const rh = hourlyRH[i] ?? 75;
       const rainProb = hourlyRainProb[i] ?? 20;
+      const rainMm = hourlyRainMm[i] ?? 0;
+      const wCode = hourlyWCode[i] ?? 0;
 
       const isClearSkyNight = isNight && clouds < 30 && rh < 85;
       const optimalForCompressorHeatDump = isNight || temp < 22;
 
-      let cond: HourlyForecast['weatherCondition'] = 'Sunny';
-      if (isNight && clouds < 30) {
-        cond = 'Clear Sky Night';
-      } else if (rainProb >= 70) {
-        cond = 'Heavy Storm';
-      } else if (rainProb >= 35) {
-        cond = 'Rain / Monsoon';
-      } else if (clouds >= 50) {
-        cond = 'Partly Cloudy';
+      let cond: HourlyForecast['weatherCondition'] = 'Partly Sunny';
+
+      if (isNight) {
+        if (rainProb >= 70 || (wCode >= 95 && wCode <= 99)) {
+          cond = 'Thunderstorm';
+        } else if (rainProb >= 35 || rainMm >= 0.5 || (wCode >= 51 && wCode <= 67)) {
+          cond = 'Rain';
+        } else if (clouds >= 70 || wCode === 3) {
+          cond = 'Cloudy';
+        } else if (clouds >= 20 || wCode === 1 || wCode === 2) {
+          cond = 'Partly Cloudy Night';
+        } else {
+          cond = 'Clear Night';
+        }
       } else {
-        cond = 'Sunny';
+        if (rainProb >= 70 || (wCode >= 95 && wCode <= 99)) {
+          if (clouds < 65) {
+            cond = 'Scattered Thunderstorm';
+          } else {
+            cond = 'Thunderstorm';
+          }
+        } else if (rainProb >= 40 || rainMm >= 1.0 || (wCode >= 61 && wCode <= 67)) {
+          cond = 'Rain';
+        } else if (rainProb >= 25 || rainMm > 0 || (wCode >= 51 && wCode <= 55)) {
+          cond = 'Light Rain';
+        } else if (clouds >= 70 || wCode === 3) {
+          cond = 'Cloudy';
+        } else if (clouds >= 20 || wCode === 1 || wCode === 2) {
+          cond = 'Partly Sunny';
+        } else {
+          cond = 'Sunny';
+        }
       }
 
       hourly.push({
@@ -133,7 +157,14 @@ export async function fetchTenDayForecast(
       const rainSum = dailyRainSum[d] ?? 2;
       const isSevereMonsoon = rainProb >= 70 || rainSum >= 20;
 
-      let condition: DailyForecast['weatherCondition'] = 'Sunny';
+      // Slice the 24 hours corresponding to this day
+      const dayHourly = hourly.slice(d * 24, (d + 1) * 24);
+
+      const avgClouds = dayHourly.length > 0
+        ? Math.round(dayHourly.reduce((acc, h) => acc + h.cloudCoverPercent, 0) / dayHourly.length)
+        : (rainProb > 50 ? 80 : 35);
+
+      let condition: DailyForecast['weatherCondition'] = 'Partly Sunny';
       let conditionText = 'Partly sunny';
 
       if (rainProb >= 75) {
@@ -141,16 +172,16 @@ export async function fetchTenDayForecast(
         conditionText = 'Thunderstorms with heavy rain';
       } else if (rainProb >= 40) {
         condition = 'Rain / Monsoon';
-        conditionText = 'Scattered showers';
-      } else if ((dailyMaxTemps[d] ?? 25) < 18) {
-        condition = 'Clear Sky Night';
-        conditionText = 'Cool clear sky';
-      } else if (rainProb > 25) {
-        condition = 'Partly Cloudy';
+        conditionText = 'Scattered rain showers';
+      } else if (avgClouds >= 70) {
+        condition = 'Cloudy';
+        conditionText = 'Cloudy and overcast';
+      } else if (avgClouds >= 20) {
+        condition = 'Partly Sunny';
         conditionText = 'Partly sunny';
       } else {
         condition = 'Sunny';
-        conditionText = 'Sunny and dry';
+        conditionText = 'Sunny and bright clear skies';
       }
 
       const estSolarHours = isSevereMonsoon ? 1.5 : rainProb > 40 ? 3.5 : 5.8;
@@ -173,9 +204,6 @@ export async function fetchTenDayForecast(
 
       const sunriseFormatted = formatSunTime(dailySunrise[d], '5:29 AM');
       const sunsetFormatted = formatSunTime(dailySunset[d], '5:43 PM');
-
-      // Slice the 24 hours corresponding to this day
-      const dayHourly = hourly.slice(d * 24, (d + 1) * 24);
 
       // Average humidity for this day
       const avgRh = dayHourly.length > 0
@@ -257,7 +285,7 @@ export function getSyntheticNERWeather(latitude: number, longitude: number): Wea
       rainMm: 0,
       maxT: 33,
       minT: 26,
-      cond: 'Partly Cloudy',
+      cond: 'Partly Sunny',
       condText: 'Partly sunny',
       windSpeed: 5,
       windDirDeg: 45,
@@ -272,7 +300,7 @@ export function getSyntheticNERWeather(latitude: number, longitude: number): Wea
       rainMm: 2,
       maxT: 33,
       minT: 27,
-      cond: 'Partly Cloudy',
+      cond: 'Partly Sunny',
       condText: 'Partly sunny with isolated afternoon clouds',
       windSpeed: 7,
       windDirDeg: 55,
@@ -343,27 +371,27 @@ export function getSyntheticNERWeather(latitude: number, longitude: number): Wea
       coolingStrat: 'Rainwater Condenser Subcooling Active (COP boosted to 4.3)',
     },
     {
-      rainProb: 45,
-      rainMm: 8,
-      maxT: 31,
-      minT: 25,
-      cond: 'Rain / Monsoon',
-      condText: 'Passing drizzle and cool breeze',
+      rainProb: 35,
+      rainMm: 2,
+      maxT: 29,
+      minT: 24,
+      cond: 'Cloudy',
+      condText: 'Cloudy and overcast with cool mountain breeze',
       windSpeed: 11,
       windDirDeg: 90,
-      uv: 7,
+      uv: 5,
       sunrise: '5:32 AM',
       sunset: '5:37 PM',
       avgRh: 81,
       coolingStrat: 'Earth-Air Heat Exchanger Pre-Cooling in early morning',
     },
     {
-      rainProb: 25,
+      rainProb: 20,
       rainMm: 0,
       maxT: 32,
       minT: 25,
-      cond: 'Partly Cloudy',
-      condText: 'Partly cloudy with pleasant evening',
+      cond: 'Partly Sunny',
+      condText: 'Partly sunny with pleasant evening',
       windSpeed: 8,
       windDirDeg: 40,
       uv: 8,
@@ -373,12 +401,12 @@ export function getSyntheticNERWeather(latitude: number, longitude: number): Wea
       coolingStrat: 'Full Solar PV Utilization (Est. 4.9 kWh generation)',
     },
     {
-      rainProb: 15,
+      rainProb: 10,
       rainMm: 0,
       maxT: 33,
       minT: 24,
-      cond: 'Clear Sky Night',
-      condText: 'Clear sky with crisp mountain night radiation',
+      cond: 'Sunny',
+      condText: 'Full sun and clear sky with crisp mountain night radiation',
       windSpeed: 6,
       windDirDeg: 30,
       uv: 9,
@@ -423,12 +451,19 @@ export function getSyntheticNERWeather(latitude: number, longitude: number): Wea
     const dayHourly: HourlyForecast[] = [];
 
     // Construct 24 hours for each day
-    // Day 0 matches reference screenshot:
-    // Now: 29°, 8 AM: 29° (20%), 9 AM: 30° (20%), 10 AM: 31°, 11 AM: 32° (30%), 12 PM: 33°...
-    // Hourly humidity: Now 83%, 8 AM 83%, 9 AM 77%, 10 AM 73%, 11 AM 69%, 12 PM 66%, 1 PM 64%, 2 PM 64%...
+    // Day 0 matches reference screenshots from Google Weather:
+    // 12 AM - 1 AM: Clear Night
+    // 2 AM - 3 AM: Partly Cloudy Night
+    // 4 AM: Clear Night, 5 AM: Partly Cloudy Night
+    // 6 AM: Sunny (Full Sun), 7 AM - 9 AM: Partly Sunny
+    // 10 AM - 11 AM: Light Rain (30%, 40%)
+    // 12 PM - 1 PM: Rain (40%, 50%)
+    // 2 PM: Scattered Thunderstorm (Sun + storm + lightning, 40%)
+    // 3 PM: Partly Sunny, 4 PM: Full Sun, 5 PM: Partly Sunny
+    // 6 PM - 8 PM: Partly Cloudy Night, 9 PM - 11 PM: Clear Night
     for (let h = 0; h < 24; h++) {
       const hourDate = new Date(targetDate.getTime() + h * 3600000);
-      const isNight = h >= 22 || h <= 5;
+      const isNight = h >= 19 || h <= 5;
       const hourLabel = h === 7 ? 'Now' : hourDate.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
 
       let temp = p.minT;
@@ -436,39 +471,85 @@ export function getSyntheticNERWeather(latitude: number, longitude: number): Wea
       let rh = p.avgRh;
       let windH = p.windSpeed;
       let solar = 0;
+      let cond: HourlyForecast['weatherCondition'] = 'Partly Sunny';
 
       if (i === 0) {
-        // Faithful mapping matching reference screenshot
+        // Faithful mapping matching user's reference screenshots from Google Weather
         const hourTemps = [27, 26, 26, 26, 26, 27, 28, 29, 29, 30, 31, 32, 33, 33, 33, 32, 31, 30, 29, 28, 28, 27, 27, 26];
-        const hourRainProbs = [0, 0, 0, 0, 0, 0, 10, 20, 20, 20, 25, 30, 30, 25, 20, 15, 10, 5, 0, 0, 0, 0, 0, 0];
+        const hourRainProbs = [0, 0, 0, 0, 0, 0, 10, 20, 20, 20, 30, 40, 40, 50, 40, 20, 15, 20, 10, 5, 0, 0, 0, 0];
         const hourRH = [88, 90, 92, 92, 90, 88, 85, 83, 83, 77, 73, 69, 66, 64, 64, 66, 68, 72, 75, 78, 80, 82, 85, 86];
         const hourSolarW = [0, 0, 0, 0, 0, 0, 80, 240, 420, 620, 780, 850, 840, 790, 680, 480, 260, 90, 0, 0, 0, 0, 0, 0];
         const hourWinds = [4, 4, 3, 3, 4, 4, 5, 5, 5, 6, 6, 7, 7, 7, 6, 6, 5, 5, 4, 4, 4, 4, 4, 4];
+
+        const day0Conditions: HourlyForecast['weatherCondition'][] = [
+          'Clear Night',         // 12 AM (Moon)
+          'Clear Night',         // 1 AM (Moon)
+          'Partly Cloudy Night', // 2 AM (Moon + cloud)
+          'Partly Cloudy Night', // 3 AM (Moon + cloud)
+          'Clear Night',         // 4 AM (Moon)
+          'Partly Cloudy Night', // 5 AM (Moon + cloud)
+          'Sunny',               // 6 AM (Full Sun)
+          'Partly Sunny',        // 7 AM (Sun with cloud)
+          'Partly Sunny',        // 8 AM (Sun with cloud)
+          'Partly Sunny',        // 9 AM (Sun with cloud)
+          'Light Rain',          // 10 AM (Dark cloud with single drop, 30%)
+          'Light Rain',          // 11 AM (Dark cloud with single drop, 40%)
+          'Rain',                // 12 PM (Dark cloud with drop, 40%)
+          'Rain',                // 1 PM (Dark cloud with drop, 50%)
+          'Scattered Thunderstorm', // 2 PM (Sun + storm cloud + lightning, 40%)
+          'Partly Sunny',        // 3 PM (Sun with cloud)
+          'Sunny',               // 4 PM (Full Sun radiant disc)
+          'Partly Sunny',        // 5 PM (Sun with cloud)
+          'Partly Cloudy Night', // 6 PM (Moon + cloud)
+          'Partly Cloudy Night', // 7 PM (Moon + cloud)
+          'Partly Cloudy Night', // 8 PM (Moon + cloud)
+          'Clear Night',         // 9 PM (Moon)
+          'Partly Cloudy Night', // 10 PM (Moon + cloud)
+          'Clear Night',         // 11 PM (Moon)
+        ];
 
         temp = hourTemps[h] ?? 29;
         rainChance = hourRainProbs[h] ?? 20;
         rh = hourRH[h] ?? 73;
         solar = hourSolarW[h] ?? 0;
         windH = hourWinds[h] ?? 5;
+        cond = day0Conditions[h] ?? 'Partly Sunny';
       } else {
         const peakSun = h >= 10 && h <= 15;
         temp = isNight ? p.minT : p.maxT - Math.abs(13 - h) * 0.9;
         rh = isNight ? Math.min(98, p.avgRh + 12) : Math.max(50, p.avgRh - 10);
         solar = peakSun && !isSevere ? 720 - Math.abs(13 - h) * 110 : isSevere ? 70 : 0;
         windH = isSevere ? p.windSpeed + (h % 5) : p.windSpeed;
-      }
 
-      let cond: HourlyForecast['weatherCondition'] = 'Partly Cloudy';
-      if (isNight && rh < 80) {
-        cond = 'Clear Sky Night';
-      } else if (rainChance >= 60) {
-        cond = 'Heavy Storm';
-      } else if (rainChance >= 25) {
-        cond = 'Rain / Monsoon';
-      } else if (temp > 30 && rainChance < 20) {
-        cond = 'Sunny';
-      } else {
-        cond = 'Partly Cloudy';
+        const avgClouds = p.cond === 'Cloudy' ? 85 : (p.cond === 'Partly Sunny' || p.cond === 'Partly Cloudy') ? 45 : p.rainProb > 40 ? 75 : 15;
+
+        if (isNight) {
+          if (rainChance >= 70) {
+            cond = 'Thunderstorm';
+          } else if (rainChance >= 35) {
+            cond = 'Rain';
+          } else if (avgClouds >= 70) {
+            cond = 'Cloudy';
+          } else if (avgClouds >= 25) {
+            cond = 'Partly Cloudy Night';
+          } else {
+            cond = 'Clear Night';
+          }
+        } else {
+          if (rainChance >= 70) {
+            cond = h === 14 ? 'Scattered Thunderstorm' : 'Thunderstorm';
+          } else if (rainChance >= 40) {
+            cond = 'Rain';
+          } else if (rainChance >= 25) {
+            cond = 'Light Rain';
+          } else if (avgClouds >= 70) {
+            cond = 'Cloudy';
+          } else if (avgClouds >= 25) {
+            cond = (h === 11 || h === 15 || h === 16) ? 'Sunny' : 'Partly Sunny';
+          } else {
+            cond = 'Sunny';
+          }
+        }
       }
 
       const item: HourlyForecast = {

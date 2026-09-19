@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
 import {
   Sun,
-  Cloud,
   CloudRain,
-  CloudLightning,
-  Moon,
   Wind,
   Droplets,
   AlertCircle,
@@ -20,45 +17,275 @@ interface WeatherForecastCardProps {
   weather: WeatherData;
 }
 
-// Visual weather condition icon renderer
+// --- Google Weather Authentic Vector SVGs ---
+
+// 1. Full Sun: Scalloped 12-lobed golden flower sun disc
+const FullSunIcon: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' }) => (
+  <svg viewBox="0 0 32 32" className={`${className} flex-shrink-0`} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="gwFullSunGrad" x1="16" y1="2" x2="16" y2="30" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#FDE047" />
+        <stop offset="50%" stopColor="#FBBF24" />
+        <stop offset="100%" stopColor="#F59E0B" />
+      </linearGradient>
+    </defs>
+    <g transform="translate(16, 16)">
+      <circle cx="0" cy="0" r="11.5" fill="url(#gwFullSunGrad)" />
+      {[0, 30, 60].map((angle) => (
+        <rect
+          key={angle}
+          x="-11.5"
+          y="-11.5"
+          width="23"
+          height="23"
+          rx="6"
+          fill="url(#gwFullSunGrad)"
+          transform={`rotate(${angle})`}
+        />
+      ))}
+      <circle cx="0" cy="0" r="8" fill="#FDE047" opacity="0.35" />
+    </g>
+  </svg>
+);
+
+// 2. Partly Sunny: Golden scalloped sun with puffy white/grey cloud in front
+const PartlySunnyIcon: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' }) => (
+  <svg viewBox="0 0 32 32" className={`${className} flex-shrink-0`} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="gwPartSunGrad" x1="12" y1="3" x2="12" y2="21" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#FDE047" />
+        <stop offset="60%" stopColor="#FBBF24" />
+        <stop offset="100%" stopColor="#F59E0B" />
+      </linearGradient>
+      <linearGradient id="gwCloudDayGrad" x1="18" y1="13" x2="18" y2="28" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#FFFFFF" />
+        <stop offset="70%" stopColor="#F1F5F9" />
+        <stop offset="100%" stopColor="#CBD5E1" />
+      </linearGradient>
+    </defs>
+    {/* Sun in upper left */}
+    <g transform="translate(12, 11)">
+      <circle cx="0" cy="0" r="8.5" fill="url(#gwPartSunGrad)" />
+      {[0, 30, 60].map((angle) => (
+        <rect
+          key={angle}
+          x="-8.5"
+          y="-8.5"
+          width="17"
+          height="17"
+          rx="4.5"
+          fill="url(#gwPartSunGrad)"
+          transform={`rotate(${angle})`}
+        />
+      ))}
+    </g>
+    {/* White cloud in lower right */}
+    <path
+      d="M21 15 C20.3 15 19.6 15.2 19 15.5 C18 13.5 15.8 12 13.5 12 C10.2 12 7.5 14.7 7.5 18 C7.5 18.4 7.6 18.8 7.7 19.2 C6.4 19.7 5.5 21 5.5 22.5 C5.5 24.4 7.1 26 9 26 L22.5 26 C24.4 26 26 24.4 26 22.5 C26 20.7 24.6 19.2 22.8 19 C22.9 18.7 23 18.3 23 18 C23 16.3 21.7 15 21 15 Z"
+      fill="url(#gwCloudDayGrad)"
+      filter="drop-shadow(0 2px 3px rgba(0,0,0,0.25))"
+    />
+  </svg>
+);
+
+// 3. Cloudy: Overcast layered soft clouds (darker rear + lighter front)
+const CloudyIcon: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' }) => (
+  <svg viewBox="0 0 32 32" className={`${className} flex-shrink-0`} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="gwCloudBack" x1="15" y1="7" x2="15" y2="23" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#94A3B8" />
+        <stop offset="100%" stopColor="#475569" />
+      </linearGradient>
+      <linearGradient id="gwCloudFront" x1="18" y1="13" x2="18" y2="27" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#FFFFFF" />
+        <stop offset="70%" stopColor="#E2E8F0" />
+        <stop offset="100%" stopColor="#CBD5E1" />
+      </linearGradient>
+    </defs>
+    {/* Darker rear cloud */}
+    <path
+      d="M19 9 C18.3 9 17.6 9.2 17 9.5 C16 7.5 13.8 6 11.5 6 C8.2 6 5.5 8.7 5.5 12 C5.5 12.4 5.6 12.8 5.7 13.2 C4.4 13.7 3.5 15 3.5 16.5 C3.5 18.4 5.1 20 7 20 L20.5 20 C22.4 20 24 18.4 24 16.5 C24 14.7 22.6 13.2 20.8 13 C20.9 12.7 21 12.3 21 12 C21 10.3 19.7 9 19 9 Z"
+      fill="url(#gwCloudBack)"
+    />
+    {/* Foreground puffy cloud */}
+    <path
+      d="M21 15 C20.3 15 19.6 15.2 19 15.5 C18 13.5 15.8 12 13.5 12 C10.2 12 7.5 14.7 7.5 18 C7.5 18.4 7.6 18.8 7.7 19.2 C6.4 19.7 5.5 21 5.5 22.5 C5.5 24.4 7.1 26 9 26 L22.5 26 C24.4 26 26 24.4 26 22.5 C26 20.7 24.6 19.2 22.8 19 C22.9 18.7 23 18.3 23 18 C23 16.3 21.7 15 21 15 Z"
+      fill="url(#gwCloudFront)"
+      filter="drop-shadow(0 2px 4px rgba(0,0,0,0.3))"
+    />
+  </svg>
+);
+
+// 4. Rain / Light Rain: Smooth dark slate cloud with bright blue teardrop water drops
+const RainIcon: React.FC<{ isHeavy?: boolean; className?: string }> = ({ isHeavy = false, className = 'w-6 h-6' }) => (
+  <svg viewBox="0 0 32 32" className={`${className} flex-shrink-0`} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="gwRainCloud" x1="16" y1="6" x2="16" y2="21" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#64748B" />
+        <stop offset="100%" stopColor="#334155" />
+      </linearGradient>
+      <linearGradient id="gwRainDrop" x1="16" y1="21" x2="16" y2="29" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#38BDF8" />
+        <stop offset="100%" stopColor="#0284C7" />
+      </linearGradient>
+    </defs>
+    {/* Dark rounded rain cloud */}
+    <path
+      d="M21 9 C20.3 9 19.6 9.2 19 9.5 C18 7.5 15.8 6 13.5 6 C10.2 6 7.5 8.7 7.5 12 C7.5 12.4 7.6 12.8 7.7 13.2 C6.4 13.7 5.5 15 5.5 16.5 C5.5 18.4 7.1 20 9 20 L22.5 20 C24.4 20 26 18.4 26 16.5 C26 14.7 24.6 13.2 22.8 13 C22.9 12.7 23 12.3 23 12 C23 10.3 21.7 9 21 9 Z"
+      fill="url(#gwRainCloud)"
+      filter="drop-shadow(0 2px 3px rgba(0,0,0,0.3))"
+    />
+    {/* Center teardrop raindrop */}
+    <path
+      d="M16 22 C16 22 13.8 25.2 13.8 26.5 C13.8 27.7 14.8 28.7 16 28.7 C17.2 28.7 18.2 27.7 18.2 26.5 C18.2 25.2 16 22 16 22 Z"
+      fill="url(#gwRainDrop)"
+    />
+    {isHeavy && (
+      <>
+        <path
+          d="M11 22.5 C11 22.5 9.2 25 9.2 26 C9.2 27 10 27.8 11 27.8 C12 27.8 12.8 27 12.8 26 C12.8 25 11 22.5 11 22.5 Z"
+          fill="url(#gwRainDrop)"
+        />
+        <path
+          d="M21 22.5 C21 22.5 19.2 25 19.2 26 C19.2 27 20 27.8 21 27.8 C22 27.8 22.8 27 22.8 26 C22.8 25 21 22.5 21 22.5 Z"
+          fill="url(#gwRainDrop)"
+        />
+      </>
+    )}
+  </svg>
+);
+
+// 5. Thunderstorm / Scattered Storm: Dark storm cloud with sharp golden lightning bolt
+const ThunderstormIcon: React.FC<{ hasSun?: boolean; className?: string }> = ({ hasSun = false, className = 'w-6 h-6' }) => (
+  <svg viewBox="0 0 32 32" className={`${className} flex-shrink-0`} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="gwStormSun" x1="10" y1="2" x2="10" y2="18" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#FDE047" />
+        <stop offset="100%" stopColor="#F59E0B" />
+      </linearGradient>
+      <linearGradient id="gwStormCloud" x1="16" y1="7" x2="16" y2="21" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#475569" />
+        <stop offset="100%" stopColor="#1E293B" />
+      </linearGradient>
+      <linearGradient id="gwLightning" x1="16" y1="16" x2="16" y2="29" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#FDE047" />
+        <stop offset="100%" stopColor="#F59E0B" />
+      </linearGradient>
+    </defs>
+    {hasSun && (
+      <g transform="translate(10, 9)">
+        <circle cx="0" cy="0" r="6.5" fill="url(#gwStormSun)" />
+        {[0, 30, 60].map((angle) => (
+          <rect
+            key={angle}
+            x="-6.5"
+            y="-6.5"
+            width="13"
+            height="13"
+            rx="3.5"
+            fill="url(#gwStormSun)"
+            transform={`rotate(${angle})`}
+          />
+        ))}
+      </g>
+    )}
+    {/* Dark storm cloud */}
+    <path
+      d="M21 9 C20.3 9 19.6 9.2 19 9.5 C18 7.5 15.8 6 13.5 6 C10.2 6 7.5 8.7 7.5 12 C7.5 12.4 7.6 12.8 7.7 13.2 C6.4 13.7 5.5 15 5.5 16.5 C5.5 18.4 7.1 20 9 20 L22.5 20 C24.4 20 26 18.4 26 16.5 C26 14.7 24.6 13.2 22.8 13 C22.9 12.7 23 12.3 23 12 C23 10.3 21.7 9 21 9 Z"
+      fill="url(#gwStormCloud)"
+      filter="drop-shadow(0 2px 3px rgba(0,0,0,0.4))"
+    />
+    {/* Sharp golden lightning bolt */}
+    <path
+      d="M17 16 L13.5 22 L16.5 22 L14 28 L20 21 L17 21 L18.5 16 Z"
+      fill="url(#gwLightning)"
+      filter="drop-shadow(0 0 4px rgba(250,204,21,0.8))"
+    />
+    {/* Raindrop on left */}
+    <path
+      d="M10.5 21 C10.5 21 9.2 23 9.2 23.8 C9.2 24.5 9.8 25 10.5 25 C11.2 25 11.8 24.5 11.8 23.8 C11.8 23 10.5 21 10.5 21 Z"
+      fill="#38BDF8"
+    />
+  </svg>
+);
+
+// 6. Clear Night: Solid smooth sky-blue crescent moon
+const ClearNightIcon: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' }) => (
+  <svg viewBox="0 0 32 32" className={`${className} flex-shrink-0`} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="gwNightMoon" x1="16" y1="4" x2="16" y2="28" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#BAE6FD" />
+        <stop offset="40%" stopColor="#60A5FA" />
+        <stop offset="100%" stopColor="#3B82F6" />
+      </linearGradient>
+    </defs>
+    <path
+      d="M21.5 19.5 C20.4 20.8 18.8 21.6 17 21.6 C13.1 21.6 10 18.5 10 14.6 C10 12 11.4 9.8 13.5 8.6 C9.2 9.4 6 13.1 6 17.6 C6 22.8 10.2 27 15.4 27 C19.3 27 22.6 24.5 23.8 21 C23 20.6 22.2 20.1 21.5 19.5 Z"
+      fill="url(#gwNightMoon)"
+      filter="drop-shadow(0 0 5px rgba(96,165,250,0.5))"
+    />
+  </svg>
+);
+
+// 7. Partly Cloudy Night: Sky-blue crescent moon with soft puffy white cloud in front
+const PartlyCloudyNightIcon: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' }) => (
+  <svg viewBox="0 0 32 32" className={`${className} flex-shrink-0`} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="gwNightPartMoon" x1="14" y1="4" x2="14" y2="22" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#BAE6FD" />
+        <stop offset="100%" stopColor="#60A5FA" />
+      </linearGradient>
+      <linearGradient id="gwNightCloud" x1="18" y1="13" x2="18" y2="27" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#FFFFFF" />
+        <stop offset="70%" stopColor="#E2E8F0" />
+        <stop offset="100%" stopColor="#94A3B8" />
+      </linearGradient>
+    </defs>
+    {/* Blue crescent moon in upper left */}
+    <path
+      d="M17.5 14.5 C16.7 15.4 15.5 16 14.2 16 C11.4 16 9.2 13.8 9.2 11 C9.2 9.1 10.2 7.5 11.7 6.6 C8.6 7.2 6.3 9.9 6.3 13.1 C6.3 16.9 9.4 19.9 13.1 19.9 C16 19.9 18.4 18.1 19.2 15.6 C18.6 15.3 18 14.9 17.5 14.5 Z"
+      fill="url(#gwNightPartMoon)"
+      filter="drop-shadow(0 0 3px rgba(96,165,250,0.4))"
+    />
+    {/* Puffy cloud in bottom right */}
+    <path
+      d="M21 16 C20.3 16 19.6 16.2 19 16.5 C18 14.4 15.8 13 13.5 13 C10.1 13 7.5 15.7 7.5 19 C7.5 19.4 7.6 19.8 7.7 20.2 C6.4 20.7 5.5 22 5.5 23.5 C5.5 25.4 7.1 27 9 27 L22.5 27 C24.4 26 26 24.4 26 22.5 C26 20.7 24.6 19.2 22.8 20 C22.9 19.7 23 19.3 23 19 C23 17.3 21.7 16 21 16 Z"
+      fill="url(#gwNightCloud)"
+      filter="drop-shadow(0 2px 3px rgba(0,0,0,0.25))"
+    />
+  </svg>
+);
+
+// Visual weather condition icon renderer matching Google Weather art style
 const WeatherConditionIcon: React.FC<{
   condition: DailyForecast['weatherCondition'];
   className?: string;
 }> = ({ condition, className = 'w-6 h-6' }) => {
   switch (condition) {
     case 'Sunny':
-      return (
-        <div className="relative inline-flex items-center justify-center">
-          <Sun className={`${className} text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]`} />
-        </div>
-      );
+      return <FullSunIcon className={className} />;
+    case 'Partly Sunny':
     case 'Partly Cloudy':
-      return (
-        <div className="relative inline-flex items-center justify-center">
-          <Sun className="w-5 h-5 text-amber-400 -mr-2 -mt-1" />
-          <Cloud className={`${className} text-slate-300 drop-shadow-sm`} />
-        </div>
-      );
-    case 'Heavy Storm':
-      return (
-        <div className="relative inline-flex items-center justify-center">
-          <CloudLightning className={`${className} text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]`} />
-        </div>
-      );
+      return <PartlySunnyIcon className={className} />;
+    case 'Cloudy':
+      return <CloudyIcon className={className} />;
+    case 'Light Rain':
+      return <RainIcon isHeavy={false} className={className} />;
+    case 'Rain':
     case 'Rain / Monsoon':
-      return (
-        <div className="relative inline-flex items-center justify-center">
-          <CloudRain className={`${className} text-sky-400 drop-shadow-[0_0_6px_rgba(56,189,248,0.5)]`} />
-        </div>
-      );
+      return <RainIcon isHeavy={true} className={className} />;
+    case 'Scattered Thunderstorm':
+      return <ThunderstormIcon hasSun={true} className={className} />;
+    case 'Heavy Storm':
+    case 'Thunderstorm':
+      return <ThunderstormIcon hasSun={false} className={className} />;
     case 'Clear Sky Night':
-      return (
-        <div className="relative inline-flex items-center justify-center">
-          <Moon className={`${className} text-indigo-300 drop-shadow-[0_0_6px_rgba(165,180,252,0.5)]`} />
-        </div>
-      );
+    case 'Clear Night':
+      return <ClearNightIcon className={className} />;
+    case 'Partly Cloudy Night':
+      return <PartlyCloudyNightIcon className={className} />;
     default:
-      return <Cloud className={`${className} text-slate-400`} />;
+      return <PartlySunnyIcon className={className} />;
   }
 };
 
