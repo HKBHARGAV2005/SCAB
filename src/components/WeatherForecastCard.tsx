@@ -232,47 +232,95 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
   const renderDetailContent = () => (
     <div className="space-y-4">
       {/* 1. Top 10-Day Selector Carousel (Clickable Days) */}
+      {/* 1. Top 10-Day Selector Carousel (Clickable Days with Severe Highlights) */}
       <div>
-        <div className="flex items-center justify-between pb-1 text-xs text-slate-400">
-          <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-300">
-            10-Day Forecast Schedule (Tap any day)
-          </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1 text-xs text-slate-400">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-300">
+              10-Day Forecast Schedule (Tap any day)
+            </span>
+            {upcomingMonsoonDays.length > 0 && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/40 shadow-sm">
+                <AlertCircle className="w-3 h-3 text-amber-400 animate-pulse" />
+                <span>{upcomingMonsoonDays.length} Severe Days Detected by AI</span>
+              </span>
+            )}
+          </div>
           <span className="text-[10px] font-mono text-sky-400">Live GPS: {weather.latitude.toFixed(2)}°N, {weather.longitude.toFixed(2)}°E</span>
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-2 pt-1 no-scrollbar scroll-smooth">
+        <div className="flex gap-2.5 overflow-x-auto pb-2.5 pt-1.5 no-scrollbar scroll-smooth">
           {days.map((day, idx) => {
             const isSelected = idx === selectedDayIndex;
+            const isSevere = day.isSevereMonsoonDay;
+
             return (
               <button
                 key={day.date}
                 onClick={() => setSelectedDayIndex(idx)}
-                className={`flex-shrink-0 min-w-[68px] sm:min-w-[74px] p-2.5 rounded-2xl flex flex-col items-center justify-between transition-all duration-200 text-center ${
-                  isSelected
+                className={`relative flex-shrink-0 min-w-[72px] sm:min-w-[80px] p-2.5 rounded-2xl flex flex-col items-center justify-between transition-all duration-200 text-center ${
+                  isSevere
+                    ? isSelected
+                      ? 'bg-gradient-to-b from-amber-900/60 via-slate-800/95 to-slate-900 border-2 border-amber-400 shadow-xl shadow-amber-500/30 ring-2 ring-amber-400/40'
+                      : 'bg-gradient-to-b from-amber-950/40 via-[#1c2433] to-[#121c27] border-2 border-amber-500/60 shadow-md shadow-amber-500/15 hover:border-amber-400 hover:from-amber-950/60'
+                    : isSelected
                     ? 'bg-slate-800/95 border-2 border-sky-400/80 shadow-lg shadow-sky-500/20'
                     : 'bg-[#152230]/70 border border-slate-700/40 hover:bg-slate-800/60 hover:border-slate-600'
                 }`}
               >
+                {/* Severe Day Warning Badge on Top */}
+                {isSevere ? (
+                  <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-500/25 text-amber-300 border border-amber-500/60 text-[8px] font-black tracking-wider uppercase shadow-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping inline-block" />
+                    <span>Severe</span>
+                  </div>
+                ) : (
+                  <div className="h-[17px]" />
+                )}
+
                 <span
-                  className={`text-xs font-bold block ${
-                    isSelected ? 'text-white' : 'text-slate-300'
+                  className={`text-xs font-bold block mt-1 ${
+                    isSelected
+                      ? 'text-white'
+                      : isSevere
+                      ? 'text-amber-200 font-extrabold'
+                      : 'text-slate-300'
                   }`}
                 >
                   {day.dayOfWeek}
                 </span>
 
                 <div className="my-1.5">
-                  <WeatherConditionIcon condition={day.weatherCondition} className="w-6 h-6" />
+                  <WeatherConditionIcon
+                    condition={day.weatherCondition}
+                    className={`w-6 h-6 ${
+                      isSevere ? 'drop-shadow-[0_0_8px_rgba(251,191,36,0.7)]' : ''
+                    }`}
+                  />
                 </div>
 
                 <div className="text-[11px] font-bold text-white tracking-tight">
                   {day.tempMax}°<span className="text-slate-400 font-normal">/{day.tempMin}°</span>
                 </div>
 
-                {/* Blue pill indicator bar under the selected day, matching Google Weather screenshot */}
-                <div className="h-1.5 mt-1 flex items-center justify-center w-full">
+                <div
+                  className={`text-[10px] font-mono mt-0.5 font-bold ${
+                    isSevere ? 'text-amber-400' : 'text-sky-400/80'
+                  }`}
+                >
+                  {day.rainProbabilityMax}% Rain
+                </div>
+
+                {/* Pill indicator bar under the selected day */}
+                <div className="h-1.5 mt-1.5 flex items-center justify-center w-full">
                   {isSelected && (
-                    <div className="h-1 w-6 bg-sky-400 rounded-full shadow-[0_0_6px_rgba(56,189,248,0.8)]" />
+                    <div
+                      className={`h-1 w-6 rounded-full ${
+                        isSevere
+                          ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)]'
+                          : 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.8)]'
+                      }`}
+                    />
                   )}
                 </div>
               </button>
@@ -553,9 +601,9 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
 
           <div className="flex items-center gap-2">
             {upcomingMonsoonDays.length > 0 && (
-              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>{upcomingMonsoonDays.length} Severe Days</span>
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/10">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                <span>{upcomingMonsoonDays.length} Severe Days Detected by AI</span>
               </div>
             )}
 
