@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Sun,
   CloudRain,
@@ -393,6 +393,24 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
 
   const upcomingMonsoonDays = days.filter((d) => d.isSevereMonsoonDay);
 
+  const hourlyScrollRef = useRef<HTMLDivElement>(null);
+  const nowPillRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll hourly slider to 'Now' element when viewing Today
+  useEffect(() => {
+    if (selectedDayIndex === 0 && nowPillRef.current && hourlyScrollRef.current) {
+      const container = hourlyScrollRef.current;
+      const target = nowPillRef.current;
+      const targetLeft = target.offsetLeft - container.offsetLeft;
+      container.scrollTo({
+        left: Math.max(0, targetLeft - 16),
+        behavior: 'smooth',
+      });
+    } else if (hourlyScrollRef.current) {
+      hourlyScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+    }
+  }, [selectedDayIndex]);
+
   // Hourly details summary calculation based on activeTab
   const getTabSummary = () => {
     switch (activeTab) {
@@ -558,49 +576,90 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
 
       {/* 2. Selected Day Hero Overview */}
       <div className="pt-1 pb-1">
-        <div className="text-sm font-semibold text-slate-300">
-          {selectedDay.formattedDate}
+        <div className="text-sm font-semibold text-slate-300 flex items-center justify-between">
+          <span>{selectedDay.formattedDate}</span>
+          {selectedDayIndex === 0 && (
+            <span className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              REAL-TIME NOW
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-4 mt-0.5">
-          <div className="text-4xl sm:text-5xl font-black text-white tracking-tight">
-            {selectedDay.tempMax}°<span className="text-slate-400 font-normal">/{selectedDay.tempMin}°</span>
+        <div className="flex items-center gap-4 mt-1">
+          <div className="text-4xl sm:text-5xl font-black text-white tracking-tight flex items-baseline gap-2">
+            <span>{selectedDayIndex === 0 ? `${weather.currentTemp}°` : `${selectedDay.tempMax}°`}</span>
+            <span className="text-slate-400 font-normal text-xl sm:text-2xl">
+              {selectedDayIndex === 0 ? `(H: ${selectedDay.tempMax}° / L: ${selectedDay.tempMin}°)` : `/${selectedDay.tempMin}°`}
+            </span>
           </div>
-          <WeatherConditionIcon condition={selectedDay.weatherCondition} className="w-10 h-10 sm:w-12 sm:h-12" />
+          <WeatherConditionIcon
+            condition={selectedDayIndex === 0 && weather.currentCondition ? weather.currentCondition : selectedDay.weatherCondition}
+            className="w-10 h-10 sm:w-12 sm:h-12"
+          />
         </div>
         <div className="text-base sm:text-lg font-medium text-sky-300 mt-0.5">
-          {selectedDay.conditionText}
+          {selectedDayIndex === 0 && weather.currentConditionText ? weather.currentConditionText : selectedDay.conditionText}
         </div>
       </div>
 
       {/* 3. Hourly Forecast Horizontal List */}
       <div>
-        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-          Hourly forecast
-        </h4>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+            Hourly forecast
+          </h4>
+          {selectedDayIndex === 0 && (
+            <span className="text-[11px] font-mono text-sky-400 font-semibold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+              Scrollable 24 Hours
+            </span>
+          )}
+        </div>
         <div className="bg-[#121c27] rounded-2xl p-4 border border-slate-800/80 shadow-inner">
-          <div className="flex gap-4 overflow-x-auto pb-1 no-scrollbar">
-            {hourlyData.map((h, i) => (
-              <div
-                key={h.time || i}
-                className="flex-shrink-0 min-w-[50px] flex flex-col items-center justify-between text-center space-y-1.5"
-              >
-                {/* Temperature */}
-                <span className="text-sm font-bold text-white">{h.temperature}°</span>
+          <div ref={hourlyScrollRef} className="flex gap-3 sm:gap-4 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
+            {hourlyData.map((h, i) => {
+              const isNow = h.hourLabel === 'Now';
+              return (
+                <div
+                  key={h.time || i}
+                  ref={isNow ? nowPillRef : undefined}
+                  className={`flex-shrink-0 min-w-[52px] flex flex-col items-center justify-between text-center space-y-1.5 py-1.5 px-1.5 rounded-xl transition-all ${
+                    isNow
+                      ? 'bg-sky-500/20 border border-sky-400/60 shadow-[0_0_12px_rgba(56,189,248,0.3)] ring-1 ring-sky-400/40'
+                      : 'hover:bg-slate-800/40'
+                  }`}
+                >
+                  {/* Temperature */}
+                  <span className={`text-sm font-bold ${isNow ? 'text-sky-300 font-black' : 'text-white'}`}>
+                    {h.temperature}°
+                  </span>
 
-                {/* Rain probability (visible when > 0%) */}
-                <span className="text-[10px] font-bold text-sky-400 min-h-[14px]">
-                  {h.precipitationProbability > 0 ? `${h.precipitationProbability}%` : ''}
-                </span>
+                  {/* Rain probability (visible when > 0%) */}
+                  <span className="text-[10px] font-bold text-sky-400 min-h-[14px]">
+                    {h.precipitationProbability > 0 ? `${h.precipitationProbability}%` : ''}
+                  </span>
 
-                {/* Weather icon */}
-                <div className="py-0.5">
-                  <WeatherConditionIcon condition={h.weatherCondition} className="w-5 h-5" />
+                  {/* Weather icon */}
+                  <div className="py-0.5">
+                    <WeatherConditionIcon condition={h.weatherCondition} className="w-5 h-5" />
+                  </div>
+
+                  {/* Hour label: Single 'Now' or time */}
+                  <span
+                    className={`text-[11px] ${
+                      isNow
+                        ? 'text-sky-400 font-black tracking-wider uppercase bg-sky-500/30 px-1.5 py-0.5 rounded shadow-sm'
+                        : 'text-slate-400 font-medium'
+                    }`}
+                  >
+                    {h.hourLabel}
+                  </span>
                 </div>
-
-                {/* Hour label: 'Now', '8 AM', etc. */}
-                <span className="text-[11px] font-medium text-slate-400">{h.hourLabel}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

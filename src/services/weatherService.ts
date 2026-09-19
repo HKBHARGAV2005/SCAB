@@ -1,4 +1,4 @@
-import { WeatherData, DailyForecast, HourlyForecast } from '../types/weather';
+import { WeatherData, DailyForecast, HourlyForecast, WeatherConditionType } from '../types/weather';
 
 function getWindDirectionText(deg: number): string {
   if (deg >= 337.5 || deg < 22.5) return 'north';
@@ -47,7 +47,7 @@ export async function fetchTenDayForecast(
   latitude: number,
   longitude: number
 ): Promise<WeatherData> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,rain,cloud_cover,direct_normal_irradiance,shortwave_radiation,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max,wind_speed_10m_max,wind_direction_10m_dominant,sunrise,sunset&timezone=auto&forecast_days=10`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,rain,cloud_cover,direct_normal_irradiance,shortwave_radiation,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max,wind_speed_10m_max,wind_direction_10m_dominant,sunrise,sunset&timezone=auto&forecast_days=10`;
 
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(6500) });
@@ -116,9 +116,11 @@ export async function fetchTenDayForecast(
         }
       }
 
+      const isCurrentHourNow = i < 24 && hour === nowHour;
+
       hourly.push({
         time: timeStr,
-        hourLabel: formatHourLabel(d, i === 0 || (i < 24 && hour === nowHour)),
+        hourLabel: formatHourLabel(d, isCurrentHourNow),
         temperature: Math.round(temp),
         relativeHumidity: Math.round(rh),
         precipitationProbability: Math.round(rainProb),
@@ -238,15 +240,74 @@ export async function fetchTenDayForecast(
       });
     }
 
+    const currentTemp = data.current?.temperature_2m != null
+      ? Math.round(data.current.temperature_2m)
+      : (hourly[nowHour]?.temperature ?? hourly[0]?.temperature ?? 24);
+
+    const currentRH = data.current?.relative_humidity_2m != null
+      ? Math.round(data.current.relative_humidity_2m)
+      : (hourly[nowHour]?.relativeHumidity ?? hourly[0]?.relativeHumidity ?? 75);
+
+    const currentRainProb = hourly[nowHour]?.precipitationProbability ?? (data.current?.rain > 0 ? 80 : 0);
+    const currentSolarWatts = hourly[nowHour]?.solarRadiationWatts ?? (nowHour >= 6 && nowHour <= 17 ? 520 : 0);
+
+    const currentWCode = data.current?.weather_code ?? hourlyWCode[nowHour] ?? 0;
+    const currentClouds = data.current?.cloud_cover ?? hourlyClouds[nowHour] ?? 20;
+    const currentRain = data.current?.rain ?? 0;
+    const currentIsNight = nowHour >= 19 || nowHour <= 5;
+    let currentCond: WeatherConditionType = 'Sunny';
+    let currentCondText = 'Sunny and bright clear skies';
+
+    if (currentIsNight) {
+      if (currentWCode >= 95) {
+        currentCond = 'Thunderstorm';
+        currentCondText = 'Thunderstorm with lightning';
+      } else if (currentRain >= 0.5 || (currentWCode >= 51 && currentWCode <= 67)) {
+        currentCond = 'Rain';
+        currentCondText = 'Rain showers';
+      } else if (currentClouds >= 70 || currentWCode === 3) {
+        currentCond = 'Cloudy';
+        currentCondText = 'Cloudy overcast sky';
+      } else if (currentClouds >= 20 || currentWCode === 1 || currentWCode === 2) {
+        currentCond = 'Partly Cloudy Night';
+        currentCondText = 'Partly cloudy night';
+      } else {
+        currentCond = 'Clear Night';
+        currentCondText = 'Clear starry night';
+      }
+    } else {
+      if (currentWCode >= 95) {
+        currentCond = currentClouds < 65 ? 'Scattered Thunderstorm' : 'Thunderstorm';
+        currentCondText = 'Thunderstorm and rain';
+      } else if (currentRain >= 1.0 || (currentWCode >= 61 && currentWCode <= 67)) {
+        currentCond = 'Rain';
+        currentCondText = 'Rain showers';
+      } else if (currentRain > 0 || (currentWCode >= 51 && currentWCode <= 55)) {
+        currentCond = 'Light Rain';
+        currentCondText = 'Light rain showers';
+      } else if (currentClouds >= 70 || currentWCode === 3) {
+        currentCond = 'Cloudy';
+        currentCondText = 'Cloudy and overcast';
+      } else if (currentClouds >= 20 || currentWCode === 1 || currentWCode === 2) {
+        currentCond = 'Partly Sunny';
+        currentCondText = 'Partly sunny';
+      } else {
+        currentCond = 'Sunny';
+        currentCondText = 'Sunny and clear skies';
+      }
+    }
+
     return {
       latitude,
       longitude,
       timezone: data.timezone || 'Asia/Kolkata',
       elevation: data.elevation || 1496,
-      currentTemp: hourly[0]?.temperature ?? 33,
-      currentRH: hourly[0]?.relativeHumidity ?? 73,
-      currentRainProb: hourly[0]?.precipitationProbability ?? 20,
-      currentSolarWatts: hourly[0]?.solarRadiationWatts ?? 580,
+      currentTemp,
+      currentRH,
+      currentRainProb,
+      currentSolarWatts,
+      currentCondition: currentCond,
+      currentConditionText: currentCondText,
       daily,
       hourly,
       lastFetched: new Date().toISOString(),
@@ -461,10 +522,13 @@ export function getSyntheticNERWeather(latitude: number, longitude: number): Wea
     // 2 PM: Scattered Thunderstorm (Sun + storm + lightning, 40%)
     // 3 PM: Partly Sunny, 4 PM: Full Sun, 5 PM: Partly Sunny
     // 6 PM - 8 PM: Partly Cloudy Night, 9 PM - 11 PM: Clear Night
+    const nowHour = now.getHours();
+
     for (let h = 0; h < 24; h++) {
       const hourDate = new Date(targetDate.getTime() + h * 3600000);
       const isNight = h >= 19 || h <= 5;
-      const hourLabel = h === 7 ? 'Now' : hourDate.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+      const isNow = i === 0 && h === nowHour;
+      const hourLabel = isNow ? 'Now' : hourDate.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
 
       let temp = p.minT;
       let rainChance = p.rainProb;
@@ -599,15 +663,20 @@ export function getSyntheticNERWeather(latitude: number, longitude: number): Wea
     });
   }
 
+  const nowHour = now.getHours();
+  const currentItem = allHourly[nowHour] || allHourly[0];
+
   return {
     latitude,
     longitude,
     timezone: 'Asia/Kolkata',
     elevation: 1525,
-    currentTemp: 33,
-    currentRH: 73,
-    currentRainProb: 20,
-    currentSolarWatts: 540,
+    currentTemp: currentItem?.temperature ?? 29,
+    currentRH: currentItem?.relativeHumidity ?? 73,
+    currentRainProb: currentItem?.precipitationProbability ?? 20,
+    currentSolarWatts: currentItem?.solarRadiationWatts ?? 540,
+    currentCondition: currentItem?.weatherCondition ?? 'Partly Sunny',
+    currentConditionText: currentItem?.weatherCondition === 'Sunny' ? 'Sunny and bright clear skies' : 'Partly sunny',
     daily: days,
     hourly: allHourly,
     lastFetched: new Date().toISOString(),

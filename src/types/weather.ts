@@ -66,6 +66,8 @@ export interface WeatherData {
   currentRH: number;
   currentRainProb: number;
   currentSolarWatts: number;
+  currentCondition?: WeatherConditionType;
+  currentConditionText?: string;
   daily: DailyForecast[];
   hourly: HourlyForecast[];
   lastFetched: string;

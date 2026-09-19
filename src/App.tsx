@@ -74,6 +74,34 @@ export const App: React.FC = () => {
     getSyntheticNERWeather(initialGps.latitude, initialGps.longitude)
   );
 
+  // Attempt device real-time geolocation on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = Math.round(pos.coords.latitude * 10000) / 10000;
+          const lon = Math.round(pos.coords.longitude * 10000) / 10000;
+          const alt = pos.coords.altitude ? Math.round(pos.coords.altitude) : 1525;
+          setTelemetry((prev) => ({
+            ...prev,
+            gps: {
+              ...prev.gps,
+              latitude: lat,
+              longitude: lon,
+              altitudeMeters: alt,
+              locationName: 'Live Device Station',
+              lastUpdated: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+            },
+          }));
+        },
+        () => {
+          // Fallback to initial NER cluster if location access is restricted
+        },
+        { enableHighAccuracy: false, timeout: 6000, maximumAge: 60000 }
+      );
+    }
+  }, []);
+
   // Fetch real 10-day weather on mount and when GPS coordinates change
   useEffect(() => {
     let active = true;

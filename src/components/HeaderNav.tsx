@@ -1,5 +1,5 @@
-import React from 'react';
-import { ShieldCheck, Cpu, User, BatteryCharging, Snowflake, Radio, MapPin, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, Cpu, User, BatteryCharging, Snowflake, Radio, MapPin, AlertTriangle, Clock, Calendar } from 'lucide-react';
 import { TelemetryData } from '../types/telemetry';
 
 interface HeaderNavProps {
@@ -14,6 +14,30 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
   telemetry,
 }) => {
   const isPrimed = telemetry.primingStatus.isPrimed;
+
+  // Real-time live digital clock ticking every second
+  const [currentDateTime, setCurrentDateTime] = useState<Date>(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const timeFormatted = currentDateTime.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+
+  const dateFormatted = currentDateTime.toLocaleDateString('en-US', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 
   return (
     <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3">
@@ -105,6 +129,26 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({
               <Cpu className="w-3.5 h-3.5" />
               <span>Developer / AI</span>
             </button>
+          </div>
+
+          {/* Real-time Live Date & Time Clock (Top Right Corner) */}
+          <div className="flex items-center gap-2 bg-slate-800/90 border border-slate-700/80 hover:border-teal-500/40 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-xs font-mono shadow-sm transition-all">
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <Clock className="w-3.5 h-3.5 text-teal-400 hidden xs:block" />
+            </div>
+            <div className="flex flex-col text-right leading-tight">
+              <span className="font-bold text-white tracking-wider text-[11px] sm:text-xs">
+                {timeFormatted}
+              </span>
+              <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium hidden sm:flex items-center gap-1 justify-end">
+                <Calendar className="w-2.5 h-2.5 text-sky-400/80" />
+                {dateFormatted}
+              </span>
+            </div>
           </div>
         </div>
       </div>
