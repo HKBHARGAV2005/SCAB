@@ -763,6 +763,23 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
 
               <div>
                 <label className="text-[10px] font-mono uppercase text-slate-400 block mb-1">
+                  Solar Power (W)
+                </label>
+                <input
+                  type="number"
+                  value={telemetry.solarPowerWatts}
+                  onChange={(e) => {
+                    const sol = parseFloat(e.target.value);
+                    if (!isNaN(sol) && onUpdateTelemetry) {
+                      onUpdateTelemetry({ solarPowerWatts: sol });
+                    }
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-mono uppercase text-slate-400 block mb-1">
                   Selected Crop
                 </label>
                 <select
@@ -795,7 +812,7 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    const smsStr = `$SCAB,LAT=${telemetry.gps.latitude.toFixed(4)},LON=${telemetry.gps.longitude.toFixed(4)},TC=${telemetry.chamberTemp.toFixed(1)},RH=${telemetry.chamberRH.toFixed(0)},O2=${telemetry.o2Percent.toFixed(1)},BAT=${telemetry.batterySocPercent.toFixed(0)},PCM=${telemetry.pcmChargePercent.toFixed(0)},CROP=${telemetry.selectedCrop}#`;
+                    const smsStr = `$SCAB,LAT=${telemetry.gps.latitude.toFixed(4)},LON=${telemetry.gps.longitude.toFixed(4)},TC=${telemetry.chamberTemp.toFixed(1)},RH=${telemetry.chamberRH.toFixed(0)},O2=${telemetry.o2Percent.toFixed(1)},BAT=${telemetry.batterySocPercent.toFixed(0)},PCM=${telemetry.pcmChargePercent.toFixed(0)},SOL=${Math.round(telemetry.solarPowerWatts)},CROP=${telemetry.selectedCrop}#`;
                     setTerminalInput(smsStr);
                   }}
                   className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-xl text-xs font-mono transition-colors"
@@ -805,7 +822,7 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
 
                 <button
                   onClick={() => {
-                    const smsStr = `$SCAB,LAT=${telemetry.gps.latitude.toFixed(4)},LON=${telemetry.gps.longitude.toFixed(4)},TC=${telemetry.chamberTemp.toFixed(1)},RH=${telemetry.chamberRH.toFixed(0)},O2=${telemetry.o2Percent.toFixed(1)},BAT=${telemetry.batterySocPercent.toFixed(0)},PCM=${telemetry.pcmChargePercent.toFixed(0)},CROP=${telemetry.selectedCrop}#`;
+                    const smsStr = `$SCAB,LAT=${telemetry.gps.latitude.toFixed(4)},LON=${telemetry.gps.longitude.toFixed(4)},TC=${telemetry.chamberTemp.toFixed(1)},RH=${telemetry.chamberRH.toFixed(0)},O2=${telemetry.o2Percent.toFixed(1)},BAT=${telemetry.batterySocPercent.toFixed(0)},PCM=${telemetry.pcmChargePercent.toFixed(0)},SOL=${Math.round(telemetry.solarPowerWatts)},CROP=${telemetry.selectedCrop}#`;
                     onInjectSms(smsStr);
                   }}
                   className="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs shadow-md shadow-teal-500/20 transition-all flex items-center gap-1.5"

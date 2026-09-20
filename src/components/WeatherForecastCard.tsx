@@ -844,10 +844,13 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
       {/* 6. SCAB Smart India Hackathon Cold-Storage Adaptation Brain */}
       <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-950/40 via-slate-900/60 to-slate-900 border border-teal-500/40 shadow-lg space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Sparkles className="w-4 h-4 text-teal-400 animate-pulse" />
             <span className="text-xs font-bold text-teal-300 uppercase tracking-wider">
               SCAB AI Microclimate Cold-Storage Strategy
+            </span>
+            <span className="text-[11px] font-mono text-amber-300/90 font-medium">
+              • {selectedDay.dayOfWeek} ({selectedDay.formattedDate})
             </span>
           </div>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
@@ -862,8 +865,23 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
           </div>
 
           <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50">
-            <span className="text-[10px] text-slate-400 block">Solar PV Generation</span>
-            <span className="font-bold text-amber-400 mt-0.5 block">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-slate-400 block">Solar PV Generation</span>
+              <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase ${
+                selectedDay.estimatedSolarGenerationKwh >= 4.5
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  : selectedDay.estimatedSolarGenerationKwh >= 3.0
+                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+              }`}>
+                {selectedDay.estimatedSolarGenerationKwh >= 4.5
+                  ? 'Peak Sun'
+                  : selectedDay.estimatedSolarGenerationKwh >= 3.0
+                  ? 'Moderate Sun'
+                  : 'Low Sunlight'}
+              </span>
+            </div>
+            <span className="font-bold text-amber-400 mt-1 block">
               {selectedDay.estimatedSolarGenerationKwh} kWh ({selectedDay.solarHoursEstimate} hrs sun)
             </span>
           </div>
@@ -871,9 +889,13 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
           <div className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/50">
             <span className="text-[10px] text-slate-400 block">NER Farmer Advisory</span>
             <span className="font-bold text-emerald-400 mt-0.5 block">
-              {selectedDay.isSevereMonsoonDay
+              {selectedDay.estimatedSolarGenerationKwh >= 4.5
+                ? 'High Solar: Run compressor at 90Hz to bank latent thermal cold'
+                : selectedDay.estimatedSolarGenerationKwh >= 3.0
+                ? 'Moderate Solar: Variable-frequency compressor matched to PV generation'
+                : selectedDay.isSevereMonsoonDay
                 ? 'Monsoon Storm: Pre-freeze PCM & engage water HX'
-                : 'High Solar: Run compressor at 90Hz to bank latent thermal cold'}
+                : 'Low Sun: Engage Earth-Air Heat Exchanger to minimize compressor power'}
             </span>
           </div>
         </div>

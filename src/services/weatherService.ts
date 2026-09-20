@@ -47,7 +47,7 @@ export async function fetchTenDayForecast(
   latitude: number,
   longitude: number
 ): Promise<WeatherData> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,rain,cloud_cover,direct_normal_irradiance,shortwave_radiation,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max,wind_speed_10m_max,wind_direction_10m_dominant,sunrise,sunset&timezone=auto&forecast_days=10`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,rain,cloud_cover,direct_normal_irradiance,shortwave_radiation,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunshine_duration,daylight_duration,shortwave_radiation_sum,uv_index_max,wind_speed_10m_max,wind_direction_10m_dominant,sunrise,sunset&timezone=auto&forecast_days=10`;
 
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(6500) });
@@ -145,6 +145,8 @@ export async function fetchTenDayForecast(
     const dailyWindDir: number[] = data.daily?.wind_direction_10m_dominant || [];
     const dailySunrise: string[] = data.daily?.sunrise || [];
     const dailySunset: string[] = data.daily?.sunset || [];
+    const dailySunshineDuration: number[] = data.daily?.sunshine_duration || [];
+    const dailyShortwaveSum: number[] = data.daily?.shortwave_radiation_sum || [];
 
     for (let d = 0; d < dailyDates.length; d++) {
       const dateStr = dailyDates[d];
@@ -186,14 +188,46 @@ export async function fetchTenDayForecast(
         conditionText = 'Sunny and bright clear skies';
       }
 
-      const estSolarHours = isSevereMonsoon ? 1.5 : rainProb > 40 ? 3.5 : 5.8;
-      const solarKwh = Math.round(1.2 * estSolarHours * 0.82 * 10) / 10;
+      // Compute actual sunshine hours and solar PV harvest from real Open-Meteo physical radiation
+      let estSolarHours = 0;
+      let solarKwh = 0;
+
+      const rawSunSec = dailySunshineDuration[d];
+      const rawShortwaveMj = dailyShortwaveSum[d];
+
+      if (rawShortwaveMj != null && !isNaN(rawShortwaveMj) && rawShortwaveMj > 0) {
+        // 1 MJ/m² = 1 / 3.6 kWh/m² = Peak Sun Hours (PSH)
+        const psh = rawShortwaveMj / 3.6;
+        // Cold-storage 1.2 kWp Solar PV Array with 0.82 Performance Ratio (PR)
+        solarKwh = Math.round(1.2 * psh * 0.82 * 10) / 10;
+      } else {
+        // Fallback integration across 24 hourly solar values for this day
+        const hourlySolarSumWh = dayHourly.reduce((acc, h) => acc + (h.solarRadiationWatts || 0), 0);
+        const psh = hourlySolarSumWh / 1000;
+        solarKwh = Math.round(1.2 * psh * 0.82 * 10) / 10;
+      }
+
+      if (rawSunSec != null && !isNaN(rawSunSec) && rawSunSec > 0) {
+        estSolarHours = Math.round((rawSunSec / 3600) * 10) / 10;
+      } else {
+        // WMO standard: hours with direct solar irradiance > 120 W/m²
+        const sunHoursCount = dayHourly.filter((h) => h.solarRadiationWatts > 120).length;
+        estSolarHours = sunHoursCount > 0 ? sunHoursCount : (isSevereMonsoon ? 1.8 : rainProb > 40 ? 3.8 : 7.5);
+      }
+
+      // Realistic bounds: clamp solarKwh and estSolarHours
+      solarKwh = Math.max(0.6, Math.min(8.5, solarKwh));
+      estSolarHours = Math.max(0.8, Math.min(13.5, estSolarHours));
 
       let coolingStrategy = 'Solar PV + Rainwater HX';
-      if (isSevereMonsoon) {
+      if (solarKwh >= 4.5) {
+        coolingStrategy = 'Peak Solar Direct Cooling + PCM Ice Bank Top-Up';
+      } else if (isSevereMonsoon || solarKwh < 2.5) {
         coolingStrategy = 'Pre-frozen PCM Discharge + Earth-Air HX';
-      } else if (condition === 'Sunny') {
-        coolingStrategy = 'Solar Direct + PCM Pre-Freeze Buffer';
+      } else if (rainProb >= 40) {
+        coolingStrategy = 'Solar PV + Rainwater Condenser Subcooling';
+      } else {
+        coolingStrategy = 'Hybrid Solar PV + Earth-Air HX';
       }
 
       const windMax = Math.round(dailyWindMax[d] ?? 5);
@@ -504,7 +538,11 @@ export function getSyntheticNERWeather(latitude: number, longitude: number): Wea
 
     const p = mockConditions[i];
     const isSevere = p.rainProb >= 70;
-    const estSun = isSevere ? 1.4 : p.rainProb > 40 ? 3.5 : 5.8;
+    // Each synthetic day has distinct AI-predicted sunlight hours and solar generation:
+    const sunHoursTable = [8.5, 6.2, 2.1, 1.4, 3.8, 4.6, 4.0, 7.8, 10.4, 11.2];
+    const estSun = sunHoursTable[i] ?? (isSevere ? 1.8 : 6.0);
+    const solarGenKwhTable = [5.2, 4.1, 1.9, 1.3, 3.0, 3.7, 3.2, 4.9, 6.1, 6.6];
+    const estKwh = solarGenKwhTable[i] ?? Math.round(1.2 * (estSun * 0.6) * 0.82 * 10) / 10;
     const windDirText = getWindDirectionText(p.windDirDeg);
     const windDesc = getWindDescription(p.windSpeed, windDirText);
     const uvDesc = getUvDescription(p.uv);
@@ -646,7 +684,7 @@ export function getSyntheticNERWeather(latitude: number, longitude: number): Wea
       totalPrecipitationMm: p.rainMm,
       avgCloudCover: isSevere ? 92 : 35,
       solarHoursEstimate: estSun,
-      estimatedSolarGenerationKwh: Math.round(1.2 * estSun * 0.82 * 10) / 10,
+      estimatedSolarGenerationKwh: estKwh,
       weatherCondition: p.cond,
       conditionText: p.condText,
       isSevereMonsoonDay: isSevere,
