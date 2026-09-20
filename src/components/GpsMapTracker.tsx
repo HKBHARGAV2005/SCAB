@@ -170,17 +170,17 @@ export const GpsMapTracker: React.FC<GpsMapTrackerProps> = ({
         <div>
           <h3 className="text-base font-bold text-white flex items-center gap-2">
             <Navigation className="w-4 h-4 text-teal-400" />
-            <span>u-blox NEO GPS Tracking & Manual Coordinates</span>
+            <span>u-blox NEO-6M GPS & SIM800L V2 Telemetry Tracking</span>
           </h3>
           <p className="text-xs text-slate-400">
-            Enter any custom coordinates or choose a preset to fetch live 10-day Open-Meteo weather and run the SCAB AI decision engine.
+            Auto-fetch location from <span className="text-teal-300 font-semibold">u-blox NEO-6M GPS module</span> & <span className="text-teal-300 font-semibold">SIM800L V2 GSM</span>, or enter manual coordinates to sync live 10-day Open-Meteo weather and run the SCAB AI decision engine.
           </p>
         </div>
 
         <div className="flex items-center gap-3 font-mono text-xs text-slate-300 bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-700/50">
           <div className="flex items-center gap-1 text-teal-400">
             <Radio className="w-3.5 h-3.5 animate-pulse" />
-            <span>{gps.satellites} SAT FIX</span>
+            <span>NEO-6M: {gps.satellites} SAT FIX</span>
           </div>
           <div className="h-4 w-px bg-slate-700" />
           <div className="flex items-center gap-1 text-amber-300">
@@ -195,7 +195,7 @@ export const GpsMapTracker: React.FC<GpsMapTrackerProps> = ({
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold uppercase tracking-wider text-teal-300 flex items-center gap-1.5">
             <Navigation className="w-3.5 h-3.5" />
-            Manual Coordinate & Location Input
+            Manual Coordinate & Location Input (Overrides u-blox NEO-6M / SIM800L)
           </span>
           <button
             onClick={handleUseDeviceGps}

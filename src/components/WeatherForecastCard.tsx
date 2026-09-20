@@ -11,6 +11,7 @@ import {
   Sparkles,
   ArrowLeft,
   MapPin,
+  Radio,
 } from 'lucide-react';
 import { WeatherData, DailyForecast, HourlyForecast } from '../types/weather';
 import { GpsLocation } from '../types/telemetry';
@@ -876,6 +877,19 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
             </span>
           </div>
         </div>
+
+        {/* Hardware Telemetry Provenance: u-blox NEO-6M GPS & SIM800L V2 */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-teal-900/40 text-[11px] font-mono">
+          <div className="flex items-center gap-1.5 text-teal-300">
+            <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            <span>Auto-fetch location from <strong className="text-white font-semibold">u-blox NEO-6M GPS module</strong> & <strong className="text-white font-semibold">SIM800L V2</strong></span>
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <MapPin className="w-3 h-3 text-teal-400" />
+            <span className="text-slate-300">{location?.locationName || 'Live Station'}</span>
+            <span className="text-teal-400 font-semibold">({weather.latitude.toFixed(4)}°N, {weather.longitude.toFixed(4)}°E)</span>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -904,6 +918,10 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
               <span className="font-mono text-amber-300/90 text-[11px] hidden md:inline">Alt: {weather.elevation}m</span>
               <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded ml-1">
                 Open-Meteo Live
+              </span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 bg-sky-500/15 text-sky-300 border border-sky-500/30 rounded ml-1 flex items-center gap-1">
+                <Radio className="w-3 h-3 text-sky-400 animate-pulse" />
+                Auto-fetch: u-blox NEO-6M GPS & SIM800L V2
               </span>
             </div>
           </div>
@@ -944,9 +962,15 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
                   <ArrowLeft className="w-6 h-6" />
                   <div className="flex flex-col text-left">
                     <span className="text-lg font-bold leading-tight">10-day forecast</span>
-                    <span className="text-xs text-teal-400 font-mono font-medium">
-                      {location?.locationName || 'Live Station'} ({weather.latitude.toFixed(4)}°N, {weather.longitude.toFixed(4)}°E)
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-teal-400 font-mono font-medium">
+                        {location?.locationName || 'Live Station'} ({weather.latitude.toFixed(4)}°N, {weather.longitude.toFixed(4)}°E)
+                      </span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 bg-sky-500/20 text-sky-300 rounded border border-sky-500/30 flex items-center gap-1">
+                        <Radio className="w-3 h-3 text-sky-400" />
+                        u-blox NEO-6M GPS & SIM800L V2
+                      </span>
+                    </div>
                   </div>
                 </button>
                 <button

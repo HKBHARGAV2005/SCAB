@@ -629,7 +629,7 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
                   <span>Manual Field Telemetry & Sensor Override Studio</span>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Manually enter any latitude, longitude, and physical parameters to simulate different field deployments.
+                  Auto-fetches location from <span className="text-teal-300 font-semibold">u-blox NEO-6M GPS module</span> & <span className="text-teal-300 font-semibold">SIM800L V2 GSM</span>, or allows overriding coordinates and parameters to test AI microclimate cooling adaptation.
                 </p>
               </div>
               <span className="text-[10px] font-mono uppercase px-2 py-0.5 bg-teal-500/10 text-teal-300 border border-teal-500/30 rounded-full">
