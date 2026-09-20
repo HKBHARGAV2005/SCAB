@@ -15,7 +15,7 @@ import {
   runAiOptimization,
   DEFAULT_AI_WEIGHTS,
 } from './services/aiDecisionEngine';
-import { fetchTenDayForecast, getSyntheticNERWeather } from './services/weatherService';
+import { fetchTenDayForecast, getSyntheticNERWeather, reverseGeocodeCoordinates } from './services/weatherService';
 import { decodeSmsTelemetry } from './services/smsProtocol';
 
 export const App: React.FC = () => {
@@ -78,10 +78,20 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
           const lat = Math.round(pos.coords.latitude * 10000) / 10000;
           const lon = Math.round(pos.coords.longitude * 10000) / 10000;
           const alt = pos.coords.altitude ? Math.round(pos.coords.altitude) : 1525;
+          let locName = 'Live Device Station';
+          let locState = 'Field Coordinates';
+          try {
+            const geo = await reverseGeocodeCoordinates(lat, lon);
+            locName = geo.name;
+            locState = geo.state;
+          } catch {
+            // fallback
+          }
+
           setTelemetry((prev) => ({
             ...prev,
             gps: {
@@ -89,7 +99,8 @@ export const App: React.FC = () => {
               latitude: lat,
               longitude: lon,
               altitudeMeters: alt,
-              locationName: 'Live Device Station',
+              locationName: locName,
+              state: locState,
               lastUpdated: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
             },
           }));
@@ -209,23 +220,65 @@ export const App: React.FC = () => {
         locationName: loc.name,
         state: loc.state,
         altitudeMeters: loc.alt,
-        lastUpdated: new Date().toLocaleTimeString(),
+        lastUpdated: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
       },
     }));
   };
 
-  const handleInjectSms = (smsBody: string) => {
+  const handleUpdateManualTelemetry = async (updates: Partial<TelemetryData>) => {
+    let resolvedGps = updates.gps ? { ...updates.gps } : undefined;
+    if (resolvedGps && resolvedGps.latitude && resolvedGps.longitude) {
+      if (!resolvedGps.locationName || resolvedGps.locationName.includes('°')) {
+        try {
+          const geo = await reverseGeocodeCoordinates(resolvedGps.latitude, resolvedGps.longitude);
+          resolvedGps.locationName = geo.name;
+          resolvedGps.state = geo.state;
+        } catch {
+          // keep fallback
+        }
+      }
+    }
+
+    setTelemetry((prev) => {
+      const nextGps = resolvedGps ? { ...prev.gps, ...resolvedGps } : prev.gps;
+      const nextBat = updates.batterySocPercent ?? prev.batterySocPercent;
+      const nextPcmTemp = updates.pcmTemp ?? prev.pcmTemp;
+      const nextPcmCharge = updates.pcmChargePercent ?? prev.pcmChargePercent;
+      return {
+        ...prev,
+        ...updates,
+        gps: nextGps,
+        primingStatus: evaluateColdPriming(nextBat, nextPcmTemp, nextPcmCharge),
+      };
+    });
+  };
+
+  const handleInjectSms = async (smsBody: string) => {
     const parsed = decodeSmsTelemetry(smsBody);
     if (parsed) {
-      setTelemetry((prev) => ({
-        ...prev,
-        ...parsed,
-        primingStatus: evaluateColdPriming(
-          parsed.batterySocPercent ?? prev.batterySocPercent,
-          prev.pcmTemp,
-          parsed.pcmChargePercent ?? prev.pcmChargePercent
-        ),
-      }));
+      let resolvedGps = parsed.gps ? { ...parsed.gps } : undefined;
+      if (resolvedGps && resolvedGps.latitude && resolvedGps.longitude) {
+        try {
+          const geo = await reverseGeocodeCoordinates(resolvedGps.latitude, resolvedGps.longitude);
+          resolvedGps.locationName = geo.name;
+          resolvedGps.state = geo.state;
+        } catch {
+          // fallback
+        }
+      }
+
+      setTelemetry((prev) => {
+        const nextGps = resolvedGps ? { ...prev.gps, ...resolvedGps } : prev.gps;
+        const nextBat = parsed.batterySocPercent ?? prev.batterySocPercent;
+        const nextPcmTemp = parsed.pcmTemp ?? prev.pcmTemp;
+        const nextPcmCharge = parsed.pcmChargePercent ?? prev.pcmChargePercent;
+        return {
+          ...prev,
+          ...parsed,
+          gps: nextGps,
+          primingStatus: evaluateColdPriming(nextBat, nextPcmTemp, nextPcmCharge),
+        };
+      });
     }
   };
 
@@ -264,6 +317,7 @@ export const App: React.FC = () => {
             onSetAiState={setAiState}
             onToggleRelay={handleToggleRelay}
             onInjectSms={handleInjectSms}
+            onUpdateTelemetry={handleUpdateManualTelemetry}
           />
         )}
 
@@ -274,7 +328,7 @@ export const App: React.FC = () => {
         </div>
 
         {/* 10-Day Meteorological Forecast */}
-        <WeatherForecastCard weather={weather} />
+        <WeatherForecastCard weather={weather} location={telemetry.gps} />
 
         {/* u-blox NEO GPS Tracking Map */}
         <GpsMapTracker

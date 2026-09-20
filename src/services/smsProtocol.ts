@@ -21,12 +21,14 @@ export function decodeSmsTelemetry(smsBody: string): Partial<TelemetryData> | nu
     const partial: Partial<TelemetryData> = {};
 
     if (map['LAT'] && map['LON']) {
+      const lat = parseFloat(map['LAT']);
+      const lon = parseFloat(map['LON']);
       partial.gps = {
-        latitude: parseFloat(map['LAT']),
-        longitude: parseFloat(map['LON']),
+        latitude: lat,
+        longitude: lon,
         altitudeMeters: parseFloat(map['ALT'] || '1520'),
-        locationName: map['LOC'] || 'Shillong (Rural Cluster)',
-        state: map['ST'] || 'Meghalaya',
+        locationName: map['LOC'] || `Custom Station (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`,
+        state: map['ST'] || 'Field Coordinates',
         satellites: parseInt(map['SAT'] || '8', 10),
         hasFix: true,
         lastUpdated: new Date().toLocaleTimeString(),

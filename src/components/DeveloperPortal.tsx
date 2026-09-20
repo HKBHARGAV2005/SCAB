@@ -13,9 +13,11 @@ import {
   ToggleRight,
   Terminal,
   Layers,
-  CloudSun
+  CloudSun,
+  Send,
+  Database,
 } from 'lucide-react';
-import { TelemetryData, RelayStates } from '../types/telemetry';
+import { TelemetryData, RelayStates, CropId } from '../types/telemetry';
 import { WeatherData } from '../types/weather';
 import {
   AiOptimizationWeights,
@@ -33,6 +35,7 @@ interface DeveloperPortalProps {
   onSetAiState: React.Dispatch<React.SetStateAction<DeveloperAiState>>;
   onToggleRelay: (relayKey: keyof RelayStates) => void;
   onInjectSms: (sms: string) => void;
+  onUpdateTelemetry?: (updates: Partial<TelemetryData>) => void;
 }
 
 export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
@@ -44,6 +47,7 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
   onSetAiState,
   onToggleRelay,
   onInjectSms,
+  onUpdateTelemetry,
 }) => {
   const [activeTab, setActiveTab] = useState<'tuning' | 'matrix' | 'thermo' | 'relays' | 'terminal'>('tuning');
   const [filterDay, setFilterDay] = useState<number>(1);
@@ -569,46 +573,248 @@ export const DeveloperPortal: React.FC<DeveloperPortalProps> = ({
         </div>
       )}
 
-      {/* TAB 5: GSM / SMS Terminal */}
+      {/* TAB 5: GSM / SMS Terminal & Manual Telemetry Studio */}
       {activeTab === 'terminal' && (
-        <div className="bg-slate-800/80 rounded-2xl p-5 border border-slate-700/70 space-y-4">
-          <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-emerald-400" />
-              <span>SIM800L V2 GSM & GPS Telemetry Console</span>
-            </h3>
-            <p className="text-xs text-slate-400">
-              Inject raw SMS packets to test two-way communication between mobile app and ESP32.
-            </p>
+        <div className="space-y-6">
+          {/* SIM800L Console Card */}
+          <div className="bg-slate-800/80 rounded-2xl p-5 border border-slate-700/70 space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-emerald-400" />
+                <span>SIM800L V2 GSM & GPS Telemetry Console</span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Inject raw SMS packets or manually configure field parameters to test real-time microclimate weather fetching and autonomous AI adaptation.
+              </p>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-xl font-mono text-xs text-emerald-400 space-y-2 border border-slate-800 max-h-72 overflow-y-auto">
+              <div>[SIM800L] +CMTI: &quot;SM&quot;, 1</div>
+              <div>[RECV SMS] $SCAB,LAT={telemetry.gps.latitude.toFixed(4)},LON={telemetry.gps.longitude.toFixed(4)},TC={telemetry.chamberTemp.toFixed(1)},RH={telemetry.chamberRH.toFixed(0)},O2={telemetry.o2Percent.toFixed(1)},BAT={telemetry.batterySocPercent.toFixed(0)},PCM={telemetry.pcmChargePercent.toFixed(0)},CROP={telemetry.selectedCrop}#</div>
+              <div className="text-sky-300">[LOCATION] Active Deployment: {telemetry.gps.locationName} ({telemetry.gps.latitude.toFixed(4)}°N, {telemetry.gps.longitude.toFixed(4)}°E)</div>
+              <div className="text-amber-300">[WEATHER SYNC] Open-Meteo 10-day forecast synchronized for coordinates ({telemetry.gps.latitude.toFixed(4)}, {telemetry.gps.longitude.toFixed(4)}). Ambient: {weather.currentTemp}°C.</div>
+              <div>[DECODE] Telemetry decoded. Cold Priming = {telemetry.primingStatus.isPrimed ? 'READY (100% READY)' : 'PRIMING IN PROGRESS'}.</div>
+              <div>[AI ENGINE] Optimization completed. Mode = {aiResult.activeMode}. Guaranteed Autonomy = {aiResult.predictedAutonomyDays} Days.</div>
+              <div className="text-teal-300">[DISPATCH CMD] CMD,MODE=AUTO,T_SET={aiResult.targetChamberTemp.toFixed(1)},RAIN={aiResult.recommendedRelays.rainwaterPump ? '1' : '0'},PCM={aiResult.recommendedRelays.pcmFreezeLoop ? '1' : '0'}#</div>
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Paste raw SMS string: $SCAB,LAT=...,TC=...#"
+                value={terminalInput}
+                onChange={(e) => setTerminalInput(e.target.value)}
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+              />
+              <button
+                onClick={() => {
+                  if (terminalInput.trim()) {
+                    onInjectSms(terminalInput.trim());
+                    setTerminalInput('');
+                  }
+                }}
+                className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition-colors shrink-0"
+              >
+                Inject SMS
+              </button>
+            </div>
           </div>
 
-          <div className="bg-slate-950 p-4 rounded-xl font-mono text-xs text-emerald-400 space-y-2 border border-slate-800 max-h-60 overflow-y-auto">
-            <div>[SIM800L] +CMTI: &quot;SM&quot;, 1</div>
-            <div>[RECV SMS] $SCAB,LAT={telemetry.gps.latitude.toFixed(4)},LON={telemetry.gps.longitude.toFixed(4)},TC={telemetry.chamberTemp.toFixed(1)},RH={telemetry.chamberRH.toFixed(0)},O2={telemetry.o2Percent.toFixed(1)},BAT={telemetry.batterySocPercent.toFixed(0)},PCM={telemetry.pcmChargePercent.toFixed(0)},CROP={telemetry.selectedCrop}#</div>
-            <div>[DECODE] Telemetry decoded. Cold Priming = {telemetry.primingStatus.isPrimed ? 'READY' : 'CHARGING'}.</div>
-            <div>[AI ENGINE] Optimization completed. Mode = {aiResult.activeMode}. Autonomy = {aiResult.predictedAutonomyDays} Days.</div>
-            <div className="text-teal-300">[DISPATCH CMD] CMD,MODE=AUTO,T_SET={aiResult.targetChamberTemp.toFixed(1)},RAIN={aiResult.recommendedRelays.rainwaterPump ? '1' : '0'},PCM={aiResult.recommendedRelays.pcmFreezeLoop ? '1' : '0'}#</div>
-          </div>
+          {/* Manual Telemetry & Microclimate Parameter Studio */}
+          <div className="bg-slate-800/80 rounded-2xl p-5 border border-slate-700/70 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Database className="w-4 h-4 text-teal-400" />
+                  <span>Manual Field Telemetry & Sensor Override Studio</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Manually enter any latitude, longitude, and physical parameters to simulate different field deployments.
+                </p>
+              </div>
+              <span className="text-[10px] font-mono uppercase px-2 py-0.5 bg-teal-500/10 text-teal-300 border border-teal-500/30 rounded-full">
+                Interactive Testing
+              </span>
+            </div>
 
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Paste raw SMS string: $SCAB,LAT=...,TC=...#"
-              value={terminalInput}
-              onChange={(e) => setTerminalInput(e.target.value)}
-              className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
-            />
-            <button
-              onClick={() => {
-                if (terminalInput.trim()) {
-                  onInjectSms(terminalInput.trim());
-                  setTerminalInput('');
-                }
-              }}
-              className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition-colors"
-            >
-              Inject SMS
-            </button>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="text-[10px] font-mono uppercase text-slate-400 block mb-1">
+                  Latitude (°N)
+                </label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={telemetry.gps.latitude}
+                  onChange={(e) => {
+                    const lat = parseFloat(e.target.value);
+                    if (!isNaN(lat) && onUpdateTelemetry) {
+                      onUpdateTelemetry({ gps: { ...telemetry.gps, latitude: lat } });
+                    }
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-mono uppercase text-slate-400 block mb-1">
+                  Longitude (°E)
+                </label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={telemetry.gps.longitude}
+                  onChange={(e) => {
+                    const lon = parseFloat(e.target.value);
+                    if (!isNaN(lon) && onUpdateTelemetry) {
+                      onUpdateTelemetry({ gps: { ...telemetry.gps, longitude: lon } });
+                    }
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-mono uppercase text-slate-400 block mb-1">
+                  Chamber Temp (°C)
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={telemetry.chamberTemp}
+                  onChange={(e) => {
+                    const tc = parseFloat(e.target.value);
+                    if (!isNaN(tc) && onUpdateTelemetry) {
+                      onUpdateTelemetry({ chamberTemp: tc });
+                    }
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-mono uppercase text-slate-400 block mb-1">
+                  Chamber RH (%)
+                </label>
+                <input
+                  type="number"
+                  value={telemetry.chamberRH}
+                  onChange={(e) => {
+                    const rh = parseFloat(e.target.value);
+                    if (!isNaN(rh) && onUpdateTelemetry) {
+                      onUpdateTelemetry({ chamberRH: rh });
+                    }
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-mono uppercase text-slate-400 block mb-1">
+                  Battery SOC (%)
+                </label>
+                <input
+                  type="number"
+                  value={telemetry.batterySocPercent}
+                  onChange={(e) => {
+                    const bat = parseFloat(e.target.value);
+                    if (!isNaN(bat) && onUpdateTelemetry) {
+                      onUpdateTelemetry({ batterySocPercent: bat });
+                    }
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-mono uppercase text-slate-400 block mb-1">
+                  PCM Ice Charge (%)
+                </label>
+                <input
+                  type="number"
+                  value={telemetry.pcmChargePercent}
+                  onChange={(e) => {
+                    const pcm = parseFloat(e.target.value);
+                    if (!isNaN(pcm) && onUpdateTelemetry) {
+                      onUpdateTelemetry({ pcmChargePercent: pcm });
+                    }
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-mono uppercase text-slate-400 block mb-1">
+                  O2 Concentration (%)
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={telemetry.o2Percent}
+                  onChange={(e) => {
+                    const o2 = parseFloat(e.target.value);
+                    if (!isNaN(o2) && onUpdateTelemetry) {
+                      onUpdateTelemetry({ o2Percent: o2 });
+                    }
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-mono uppercase text-slate-400 block mb-1">
+                  Selected Crop
+                </label>
+                <select
+                  value={telemetry.selectedCrop}
+                  onChange={(e) => {
+                    if (onUpdateTelemetry) {
+                      onUpdateTelemetry({ selectedCrop: e.target.value as CropId });
+                    }
+                  }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-teal-500"
+                >
+                  <option value="green_chilli">Green Chilli</option>
+                  <option value="bhut_jolokia">Bhut Jolokia</option>
+                  <option value="cabbage">Cabbage</option>
+                  <option value="french_beans">French Beans</option>
+                  <option value="tomatoes">Tomatoes</option>
+                  <option value="ginger">Ginger</option>
+                  <option value="turmeric">Turmeric</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between pt-2 gap-2">
+              <div className="text-[11px] font-mono text-slate-400">
+                <span>Active Target: </span>
+                <span className="text-white font-bold">{telemetry.gps.locationName}</span>
+                <span className="text-teal-400"> ({telemetry.gps.latitude.toFixed(4)}°N, {telemetry.gps.longitude.toFixed(4)}°E)</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const smsStr = `$SCAB,LAT=${telemetry.gps.latitude.toFixed(4)},LON=${telemetry.gps.longitude.toFixed(4)},TC=${telemetry.chamberTemp.toFixed(1)},RH=${telemetry.chamberRH.toFixed(0)},O2=${telemetry.o2Percent.toFixed(1)},BAT=${telemetry.batterySocPercent.toFixed(0)},PCM=${telemetry.pcmChargePercent.toFixed(0)},CROP=${telemetry.selectedCrop}#`;
+                    setTerminalInput(smsStr);
+                  }}
+                  className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-xl text-xs font-mono transition-colors"
+                >
+                  Format as Raw SMS
+                </button>
+
+                <button
+                  onClick={() => {
+                    const smsStr = `$SCAB,LAT=${telemetry.gps.latitude.toFixed(4)},LON=${telemetry.gps.longitude.toFixed(4)},TC=${telemetry.chamberTemp.toFixed(1)},RH=${telemetry.chamberRH.toFixed(0)},O2=${telemetry.o2Percent.toFixed(1)},BAT=${telemetry.batterySocPercent.toFixed(0)},PCM=${telemetry.pcmChargePercent.toFixed(0)},CROP=${telemetry.selectedCrop}#`;
+                    onInjectSms(smsStr);
+                  }}
+                  className="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-1.5 rounded-xl text-xs shadow-md shadow-teal-500/20 transition-all flex items-center gap-1.5"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Execute Telemetry Injection</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

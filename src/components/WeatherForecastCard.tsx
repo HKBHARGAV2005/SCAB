@@ -10,11 +10,14 @@ import {
   Minimize2,
   Sparkles,
   ArrowLeft,
+  MapPin,
 } from 'lucide-react';
 import { WeatherData, DailyForecast, HourlyForecast } from '../types/weather';
+import { GpsLocation } from '../types/telemetry';
 
 interface WeatherForecastCardProps {
   weather: WeatherData;
+  location?: GpsLocation;
 }
 
 // --- Google Weather Authentic Vector SVGs ---
@@ -382,7 +385,7 @@ const UvRadialGauge: React.FC<{ uv: number }> = ({ uv }) => {
   );
 };
 
-export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weather }) => {
+export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weather, location }) => {
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<'precipitation' | 'wind' | 'humidity' | 'solar'>('humidity');
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
@@ -491,7 +494,12 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
               </span>
             )}
           </div>
-          <span className="text-[10px] font-mono text-sky-400">Live GPS: {weather.latitude.toFixed(2)}°N, {weather.longitude.toFixed(2)}°E</span>
+          <div className="flex items-center gap-1.5 text-[11px] font-mono text-teal-300 bg-slate-900/80 px-2 py-0.5 rounded-lg border border-slate-700/60">
+            <MapPin className="w-3 h-3 text-teal-400 shrink-0" />
+            <span className="font-semibold text-white truncate max-w-[200px] sm:max-w-none">{location?.locationName || 'Live Station'}</span>
+            <span className="text-slate-500">•</span>
+            <span>{weather.latitude.toFixed(4)}°N, {weather.longitude.toFixed(4)}°E</span>
+          </div>
         </div>
 
         <div className="flex gap-2.5 overflow-x-auto pb-2.5 pt-1.5 no-scrollbar scroll-smooth">
@@ -876,16 +884,31 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
     <>
       {/* Standard In-Dashboard Card */}
       <div className="bg-slate-900/90 rounded-3xl p-5 sm:p-6 border border-slate-800 shadow-2xl space-y-4">
-        {/* Card Header with 10-day forecast and maximize modal button */}
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-sky-400" />
-            <h3 className="text-base sm:text-lg font-bold text-white tracking-wide">
-              10-Day Meteorological Forecast
-            </h3>
+        {/* Card Header with 10-day forecast, location banner, and maximize modal button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-3 gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-sky-400" />
+              <h3 className="text-base sm:text-lg font-bold text-white tracking-wide">
+                10-Day Meteorological Forecast
+              </h3>
+            </div>
+            {/* Active Microclimate Location Tag */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-300 mt-1 flex-wrap font-sans">
+              <MapPin className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+              <span className="font-bold text-white">{location?.locationName || 'Live Station'}</span>
+              {location?.state && <span className="text-slate-400">({location.state})</span>}
+              <span className="text-slate-500">•</span>
+              <span className="font-mono text-teal-300 font-semibold">{weather.latitude.toFixed(4)}°N, {weather.longitude.toFixed(4)}°E</span>
+              <span className="text-slate-500 hidden md:inline">•</span>
+              <span className="font-mono text-amber-300/90 text-[11px] hidden md:inline">Alt: {weather.elevation}m</span>
+              <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded ml-1">
+                Open-Meteo Live
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-end sm:self-auto">
             {upcomingMonsoonDays.length > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 shadow-sm shadow-amber-500/10">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
@@ -919,7 +942,12 @@ export const WeatherForecastCard: React.FC<WeatherForecastCardProps> = ({ weathe
                   className="flex items-center gap-2 text-white hover:text-sky-400 transition-colors p-1 -ml-1 rounded-lg"
                 >
                   <ArrowLeft className="w-6 h-6" />
-                  <span className="text-lg font-bold">10-day forecast</span>
+                  <div className="flex flex-col text-left">
+                    <span className="text-lg font-bold leading-tight">10-day forecast</span>
+                    <span className="text-xs text-teal-400 font-mono font-medium">
+                      {location?.locationName || 'Live Station'} ({weather.latitude.toFixed(4)}°N, {weather.longitude.toFixed(4)}°E)
+                    </span>
+                  </div>
                 </button>
                 <button
                   onClick={() => setIsFullScreen(false)}

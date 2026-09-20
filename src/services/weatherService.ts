@@ -684,3 +684,36 @@ export function getSyntheticNERWeather(latitude: number, longitude: number): Wea
   };
 }
 
+export async function reverseGeocodeCoordinates(
+  lat: number,
+  lon: number
+): Promise<{ name: string; state: string }> {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
+      {
+        headers: { 'User-Agent': 'SCAB-Solar-Cold-Storage/1.0' },
+        signal: AbortSignal.timeout(3500),
+      }
+    );
+    if (!res.ok) throw new Error('Reverse geocoding error');
+    const data = await res.json();
+    const addr = data.address || {};
+    const name =
+      addr.amenity ||
+      addr.town ||
+      addr.city ||
+      addr.village ||
+      addr.suburb ||
+      addr.county ||
+      `Station (${lat.toFixed(3)}°N, ${lon.toFixed(3)}°E)`;
+    const state = addr.state || addr.state_district || 'India';
+    return { name, state };
+  } catch {
+    return {
+      name: `Custom Station (${lat.toFixed(3)}°N, ${lon.toFixed(3)}°E)`,
+      state: 'Field Coordinates',
+    };
+  }
+}
+
